@@ -65,16 +65,18 @@ import static android.R.attr.path;
 public class MainActivity extends Activity implements
         GoogleApiClient.ConnectionCallbacks,
         GoogleApiClient.OnConnectionFailedListener,
-        LocationListener,MessageApi.MessageListener{
+        LocationListener, MessageApi.MessageListener {
 
     private static final int SPEECH_REQUEST_CODE = 0;
-	private static final String TAG = "WearMainActivity";
+    private static final String TAG = "WearMainActivity";
+    private static String ITEM_KEY;
 
-//***** use the same paths/keys as in mobile side
+
+    //***** use the same paths/keys as in mobile side
     private static final String WEAR_MESSAGE_PATH = "/message";
 
 
-//***** create your GoogleApiClient
+    //***** create your GoogleApiClient
     private GoogleApiClient mGoogleAPIClient;
 
     private ImageView itemPhoto;
@@ -83,7 +85,8 @@ public class MainActivity extends Activity implements
 
     private double latitude, longitude;
 
-//***** You might want some sort of boolean flag as to whether you are
+
+    //***** You might want some sort of boolean flag as to whether you are
 //***** currently looking for an item or not.
     private boolean working = false;
 
@@ -102,12 +105,12 @@ public class MainActivity extends Activity implements
         stub.setOnLayoutInflatedListener(new WatchViewStub.OnLayoutInflatedListener() {
             @Override
             public void onLayoutInflated(WatchViewStub stub) {
-                itemPhoto = (ImageView)stub.findViewById(R.id.photo);
+                itemPhoto = (ImageView) stub.findViewById(R.id.photo);
                 itemPhoto.setImageResource(R.drawable.photo_placeholder);
             }
         });
 
-        if (mGoogleAPIClient == null){
+        if (mGoogleAPIClient == null) {
             mGoogleAPIClient = new GoogleApiClient.Builder(this)
                     .addApi(LocationServices.API)
                     .addApi(Wearable.API)
@@ -115,14 +118,14 @@ public class MainActivity extends Activity implements
                     .addOnConnectionFailedListener(this)
                     .build();
         }
-        if (mGoogleAPIClient != null && !mGoogleAPIClient.isConnected() || mGoogleAPIClient.isConnecting()){
+        if (mGoogleAPIClient != null && !mGoogleAPIClient.isConnected() || mGoogleAPIClient.isConnecting()) {
             mGoogleAPIClient.connect();
         }
-		//create a tap detector 
-		tapDetector = new GestureDetectorCompat(MainActivity.this, new MyGestureListener(MainActivity.this));
+        //create a tap detector
+        tapDetector = new GestureDetectorCompat(MainActivity.this, new MyGestureListener(MainActivity.this));
 //***** You might want to set your flag that you aren't currently looking for and item
         working = false;
-        
+
     } //onCreate
 
     @Override
@@ -133,31 +136,31 @@ public class MainActivity extends Activity implements
             return super.dispatchTouchEvent(event);
         }
     }
-    
+
     //Custom GestureDetector.SimpleOnGestureListener
-        public class MyGestureListener extends GestureDetector.SimpleOnGestureListener {
+    public class MyGestureListener extends GestureDetector.SimpleOnGestureListener {
 
-             final Context myContext;
+        final Context myContext;
 
-             public MyGestureListener(Context context) {
-                myContext = context;
-            }
-
-            @Override
-            public void onLongPress (MotionEvent e){
-            // Detected long press, showing exit widget
-            Log.d(TAG,"Long Press");
+        public MyGestureListener(Context context) {
+            myContext = context;
         }
 
-            @Override
-            public boolean onSingleTapConfirmed(MotionEvent e) {
-            Log.d(TAG,"single tap");
-            doVoiceInput();            
+        @Override
+        public void onLongPress(MotionEvent e) {
+            // Detected long press, showing exit widget
+            Log.d(TAG, "Long Press");
+        }
+
+        @Override
+        public boolean onSingleTapConfirmed(MotionEvent e) {
+            Log.d(TAG, "single tap");
+            doVoiceInput();
             return true;
         }
 
-            @Override
-            public boolean onDoubleTap(MotionEvent event) {
+        @Override
+        public boolean onDoubleTap(MotionEvent event) {
             //present a dialog box for "found it"
             DialogInterface.OnClickListener dialogClickListener = new DialogInterface.OnClickListener() {
                 @Override
@@ -167,7 +170,7 @@ public class MainActivity extends Activity implements
                             //call code to send response
                             sendData(latitude, longitude, System.currentTimeMillis());
                             String msg = "Location sent";
-                            Log.i("message", msg);
+                            Log.d("message", msg);
                             break;
                         case DialogInterface.BUTTON_NEGATIVE:
                             //ignore
@@ -190,27 +193,28 @@ public class MainActivity extends Activity implements
 
     }//MyGestureListener
 
-//***** override your onResume/on Pause methods and connect (onResume)
+    //***** override your onResume/on Pause methods and connect (onResume)
 //***** or disconnect/remove listeners (onPause)
     @Override
-    public void onPause(){
+    public void onPause() {
 
     }
+
     @Override
-    public void onResume(){
-        if (mGoogleAPIClient != null && !mGoogleAPIClient.isConnected() || mGoogleAPIClient.isConnecting()){
+    public void onResume() {
+        if (mGoogleAPIClient != null && !mGoogleAPIClient.isConnected() || mGoogleAPIClient.isConnecting()) {
             mGoogleAPIClient.connect();
         }
         super.onResume();
     }
 
 
-//***** implement your GoogleApiClient connection methods. In the onConnected
+    //***** implement your GoogleApiClient connection methods. In the onConnected
 //***** method, add your listeners for the message and data APIs and the
 //***** location permissions and setup
 //create a location request and register as a listener when connected
     @Override
-    public void onConnected(Bundle connectionHint){
+    public void onConnected(Bundle connectionHint) {
         //create location request object
         LocationRequest locationRequest = LocationRequest.create();
 
@@ -227,36 +231,38 @@ public class MainActivity extends Activity implements
         locationRequest.setSmallestDisplacement(2);
 
         //register the listener
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED){
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             return;
         }
-        LocationServices.FusedLocationApi.requestLocationUpdates(mGoogleAPIClient,locationRequest,this);
+        LocationServices.FusedLocationApi.requestLocationUpdates(mGoogleAPIClient, locationRequest, this);
 
-        Wearable.MessageApi.addListener(mGoogleAPIClient,this);
+        Wearable.MessageApi.addListener(mGoogleAPIClient, this);
 
     }//onConnected
 
     @Override
-    public void onConnectionSuspended(int i){
+    public void onConnectionSuspended(int i) {
 
     }
 
     @Override
-    public void onConnectionFailed(ConnectionResult connectionResult){
+    public void onConnectionFailed(ConnectionResult connectionResult) {
 
     }
 
     @Override
-    protected void onStart(){super.onStart();}
+    protected void onStart() {
+        super.onStart();
+    }
 
 
     @Override
-    protected void onStop(){
+    protected void onStop() {
         //disconnect from google play services/ message api
-        if (mGoogleAPIClient != null){
-            Wearable.MessageApi.removeListener(mGoogleAPIClient,this);
-            if (mGoogleAPIClient.isConnected()){
-                LocationServices.FusedLocationApi.removeLocationUpdates(mGoogleAPIClient,this);
+        if (mGoogleAPIClient != null) {
+            Wearable.MessageApi.removeListener(mGoogleAPIClient, this);
+            if (mGoogleAPIClient.isConnected()) {
+                LocationServices.FusedLocationApi.removeLocationUpdates(mGoogleAPIClient, this);
                 mGoogleAPIClient.disconnect();
             }
         }
@@ -264,8 +270,8 @@ public class MainActivity extends Activity implements
     }
 
     @Override
-    public void onDestroy(){
-        if (mGoogleAPIClient != null){
+    public void onDestroy() {
+        if (mGoogleAPIClient != null) {
             mGoogleAPIClient.unregisterConnectionCallbacks(this);
         }
         super.onDestroy();
@@ -275,36 +281,36 @@ public class MainActivity extends Activity implements
 //***** to see if it is the next item. This code will get the image from
 //***** You may also want to set your working on an item flag to true here.
 
-    public void onDataChanged(DataEventBuffer dataEvents){
+    public void onDataChanged(DataEventBuffer dataEvents) {
         working = true;
 
-        for (DataEvent event:dataEvents){
-            if (event.getType() == DataEvent.TYPE_CHANGED){
+        for (DataEvent event : dataEvents) {
+            if (event.getType() == DataEvent.TYPE_CHANGED) {
 
                 DataMapItem dataMapItem = DataMapItem.fromDataItem(event.getDataItem());
                 Asset photoAsset = dataMapItem.getDataMap()
-                        .getAsset("acorn");
+                        .getAsset(ITEM_KEY);
                 // Loads image on background thread.
                 new LoadBitmapAsyncTask().execute(photoAsset);
             }//changed type
         }//for
     }
 
-//***** Implement your onMessageReceived event here.
+    //***** Implement your onMessageReceived event here.
 //***** The code below will set the image back to the placeholder and
 //***** pop up a dialog box. You may want to put this code in a separate 
 //***** function and call it from multiple places.
 //***** You may also want to turn your working on an item flag to false here as well
     @Override
-    public void onMessageReceived(final MessageEvent messageEvent){
+    public void onMessageReceived(final MessageEvent messageEvent) {
         working = false;
 
         //Check the path to see if one we want
-        //addthe payload to the list
+        //add the payload to the list
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                if (messageEvent.getPath().equalsIgnoreCase(WEAR_MESSAGE_PATH)){
+                if (messageEvent.getPath().equalsIgnoreCase(WEAR_MESSAGE_PATH)) {
                     ///////////////////////////////////////////
                 }
             }
@@ -339,21 +345,29 @@ public class MainActivity extends Activity implements
 //***** Implement the LocationListener callback for location updates
 
     @Override
-    public void onLocationChanged(Location location){
+    public void onLocationChanged(Location location) {
         latitude = location.getLatitude();
         longitude = location.getLongitude();
     }
 
 
-//***** Finish this code for the voice input:
+    //***** Finish this code for the voice input:
 // This callback is invoked when the Speech Recognizer returns.
 // This is where you process the intent and extract the speech text from the intent.
 //***** See the link for doVoiceInput for more info on this method.
+//Create an intent that can start the Speech Recognizer activity 
+    private void displaySpeechRecognizer() {
+        Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+        //start the activity, the intent will be populated with the speech text
+        startActivityForResult(intent, SPEECH_REQUEST_CODE);
+    }
+
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         if (requestCode == SPEECH_REQUEST_CODE && resultCode == RESULT_OK) {
-    		//check the text and if "found it", send the data and show a dialog
-    		//stating either, Location Sent or what they were supposed to say.
+            //check the text and if "found it", send the data and show a dialog
+            //stating either, Location Sent or what they were supposed to say.
             List<String> results = data.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
             String spokenText = results.get(0);
 
@@ -392,15 +406,15 @@ public class MainActivity extends Activity implements
         super.onActivityResult(requestCode, resultCode, data);
     }//onActivityResult
 
- //***** finish the code for free form voice input to allow "found it" to be said: see 
- //***** https://developer.android.com/training/wearables/apps/voice.html
+    //***** finish the code for free form voice input to allow "found it" to be said: see
+    //***** https://developer.android.com/training/wearables/apps/voice.html
     private void doVoiceInput() {
 
-         // Start the activity, the intent will be populated with the speech text
+        // Start the activity, the intent will be populated with the speech text
 
     }
 
-//***** There is where you will send the data back to the mobile side  
+    //***** There is where you will send the data back to the mobile side
     private void sendData(double latitude, double longitude, long timestamp) {
         //create a PutDataMapRequest and specify a path for it
         //The path here is used to reference this object and
@@ -419,15 +433,15 @@ public class MainActivity extends Activity implements
         //to find underneath.
         PutDataRequest request = putDataMapRequest.asPutDataRequest();
 
-        Wearable.DataApi.putDataItem(mGoogleAPIClient,request)
+        Wearable.DataApi.putDataItem(mGoogleAPIClient, request)
                 .setResultCallback(new ResultCallback<DataApi.DataItemResult>() {
                     @Override
                     public void onResult(@NonNull DataApi.DataItemResult dataItemResult) {
-                        if (!dataItemResult.getStatus().isSuccess()){
+                        if (!dataItemResult.getStatus().isSuccess()) {
                             Log.e("WATCH", "Failed to send found-it location data item" + path + dataItemResult.getStatus());
-                        } else{
+                        } else {
                             //item been collected but not necessarily delivered
-                            Log.d("WATCH", "Succesfully sent found-it location data item"+ path + dataItemResult.getStatus());
+                            Log.d("WATCH", "Succesfully sent found-it location data item" + path + dataItemResult.getStatus());
                         }
                     }
                 });
@@ -437,10 +451,10 @@ public class MainActivity extends Activity implements
 
     }//send data
 
-/*
- * Extracts {@link android.graphics.Bitmap} data from the
- * {@link com.google.android.gms.wearable.Asset}
- */
+    /*
+     * Extracts {@link android.graphics.Bitmap} data from the
+     * {@link com.google.android.gms.wearable.Asset}
+     */
     private class LoadBitmapAsyncTask extends AsyncTask<Asset, Void, Bitmap> {
 
         @Override
