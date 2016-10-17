@@ -7,6 +7,7 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.location.Location;
 import android.net.Uri;
+import android.support.annotation.NonNull;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
@@ -49,11 +50,13 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.concurrent.TimeUnit;
 
+import static android.R.attr.path;
+
 //***** Need to implement listeners for Message, Data and GoogleAPI
 public class MainActivity extends AppCompatActivity implements
         GoogleApiClient.ConnectionCallbacks,
         GoogleApiClient.OnConnectionFailedListener,
-        LocationListener {
+        DataApi.DataListener {
 
 
 //***** Should declare constants for the PATH values for Message and
@@ -62,16 +65,21 @@ public class MainActivity extends AppCompatActivity implements
 //***** You might also want a variable to hold the current item being
 //***** searched for.
     private GoogleApiClient mGoogleAPIClient;
-    private String currentItem;
-    private static final String WEAR_MESSAGE_PATH = "/message";
-    private static final String START_ACTIVITY = "/start_activity";
-    private ArrayAdapter<String> mAdapter;
-    private ListView mListView;
+    private int currentItem;
+    private static final String DONE_PATH = "/done";
+    private static final String FOUND_PATH = "/found-it";
+    private static final String ITEM_PATH = "/item";
+    private static String ITEM_KEY = "item";
+    private static String LOCATION_KEY = "location";
+
 
     private ArrayList<HashMap<String,String>> huntObjects;
     private ArrayList<HashMap<String,String>> foundObjects;
+
     private SimpleAdapter adapter;
     private ListView listView;
+
+    private Button startButton;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -137,6 +145,8 @@ public class MainActivity extends AppCompatActivity implements
 
         ((ViewGroup)listView.getParent()).addView(emptyText);
         listView.setEmptyView(emptyText);
+
+        startButton = (Button) findViewById(R.id.startHunt);
         
 //**** Create your GoogleApiClient here....
         mGoogleAPIClient = new GoogleApiClient.Builder(this)
@@ -151,49 +161,17 @@ public class MainActivity extends AppCompatActivity implements
 //***** adding the items to foundObjects and uncomment the code below
 //***** it
     public void startHunt(View v) {
-        HashMap<String, String> item = new HashMap<String, String>();
-
-        //acorn
-        item.put("itemPic",Integer.toString(R.drawable.acorn));
-        item.put("foundAt","42.9120,-77.4556");
-        foundObjects.add(item);
-
-        //chipmunk
-        item = new HashMap<String, String>();
-        item.put("itemPic",Integer.toString(R.drawable.chipmunk));
-        item.put("foundAt","42.9120,-77.4556");
-        foundObjects.add(item);
-
-        //dandelion
-        item = new HashMap<String, String>();
-        item.put("itemPic",Integer.toString(R.drawable.dandelion));
-        item.put("foundAt","42.9120,-77.4556");
-        foundObjects.add(item);
-
-        //maple leaf
-        item = new HashMap<String, String>();
-        item.put("itemPic",Integer.toString(R.drawable.maple));
-        item.put("foundAt","42.9120,-77.4556");
-        foundObjects.add(item);
-
-        //pine-cone
-        item = new HashMap<String, String>();
-        item.put("itemPic",Integer.toString(R.drawable.pine_cone));
-        item.put("foundAt","42.9120,-77.4556");
-        foundObjects.add(item);
-
-        adapter.notifyDataSetChanged();
         
-//         foundObjects.clear();
-//         adapter.notifyDataSetChanged();
-// 
-//         Uri uri = new Uri.Builder().scheme(PutDataRequest.WEAR_URI_SCHEME).path("found").build();
-//         Wearable.DataApi.deleteDataItems(mGoogleApiClient, uri, DataApi.FILTER_PREFIX);
-//         currentItem = 0;
-//         startButton.setEnabled(false);
-//         Bitmap image = BitmapFactory.decodeResource(getResources(), Integer.parseInt(huntObjects.get(0).get("picture")));
-//         sendPhoto(toAsset(image));
+        foundObjects.clear();
+        adapter.notifyDataSetChanged();
 
+
+        Uri uri = new Uri.Builder().scheme(PutDataRequest.WEAR_URI_SCHEME).path("found").build();
+        Wearable.DataApi.deleteDataItems(mGoogleAPIClient, uri, DataApi.FILTER_PREFIX);
+        currentItem = 0;
+        startButton.setEnabled(false);
+        Bitmap image = BitmapFactory.decodeResource(getResources(), Integer.parseInt(huntObjects.get(0).get("picture")));
+        sendPhoto(toAsset(image));
     }
     
         /**
@@ -227,6 +205,30 @@ public class MainActivity extends AppCompatActivity implements
 //***** and putAsset() method of the PutDataMapRequest.getDataMap() object
 //***** add a putLong to pass the date to the request as well.
  //****  Then do your putDataItem of the Wearable.DataApi
+        //Next we use put methods to add an String (location info as a string)
+        //and long key value pair for the time.
+        PutDataMapRequest putDataMapRequest = PutDataMapRequest.create(ITEM_PATH);
+
+        putDataMapRequest.getDataMap().putAsset(ITEM_KEY, asset);
+        putDataMapRequest.getDataMap().putLong("timestamp", System.currentTimeMillis());
+
+        //We then use putDataItem to submit the object,
+        //and then we need to check for errors with the callback
+        //to find underneath.
+        PutDataRequest request = putDataMapRequest.asPutDataRequest();
+
+        Wearable.DataApi.putDataItem(mGoogleAPIClient, request)
+                .setResultCallback(new ResultCallback<DataApi.DataItemResult>() {
+                    @Override
+                    public void onResult(@NonNull DataApi.DataItemResult dataItemResult) {
+                        if (!dataItemResult.getStatus().isSuccess()) {
+                            Log.e("WATCH", "Failed to send asset data item" + path + dataItemResult.getStatus());
+                        } else {
+                            //item been collected but not necessarily delivered
+                            Log.d("WATCH", "Succesfully sent asset data item" + path + dataItemResult.getStatus());
+                        }
+                    }
+                });
 
     }
 
@@ -235,35 +237,27 @@ public class MainActivity extends AppCompatActivity implements
 //***** Listeners (onStop)
     @Override
     protected void onStart(){
+        if (mGoogleAPIClient != null && !mGoogleAPIClient.isConnected() || mGoogleAPIClient.isConnecting()) {
+            mGoogleAPIClient.connect();
+        }
         super.onStart();
+    }
+
+    @Override
+    protected void onStop() {
+        //disconnect from google play services
+        if (mGoogleAPIClient != null && mGoogleAPIClient.isConnected()) {
+            Wearable.DataApi.removeListener(mGoogleAPIClient, this);
+            mGoogleAPIClient.disconnect();
+        }
+        super.onStop();
     }
 
 //***** Implement your connection callbacks for GoogleApiClient, adding your
 //***** listeners in the onConnected method.
     @Override
     public void onConnected(Bundle connectionHint){
-        //create location request object
-        LocationRequest locationRequest = LocationRequest.create();
-
-        //use high accuracy
-        locationRequest.setPriority(LocationRequest.PRIORITY_BALANCED_POWER_ACCURACY);
-
-        //update every 2s
-        locationRequest.setInterval(TimeUnit.SECONDS.toMillis(2));
-
-        //set the fastest update interval to 2s
-        locationRequest.setFastestInterval(TimeUnit.SECONDS.toMillis(2));
-
-        //set minimum displacement for accuracy in meters
-        locationRequest.setSmallestDisplacement(2);
-
-        //register the listener
-        if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED){
-            return;
-        }
-        LocationServices.FusedLocationApi.requestLocationUpdates(mGoogleAPIClient,locationRequest,this);
-
-        sendMessage(START_ACTIVITY, "");
+        Wearable.DataApi.addListener(mGoogleAPIClient, this);
     }//onConnected
 
     @Override
@@ -276,21 +270,6 @@ public class MainActivity extends AppCompatActivity implements
 
     }
 
-    @Override
-    protected void onStop(){
-        //disconnect from google play services
-        if (mGoogleAPIClient.isConnected()){
-            LocationServices.FusedLocationApi.removeLocationUpdates(mGoogleAPIClient,this);
-            mGoogleAPIClient.disconnect();
-        }
-        super.onStop();
-    }
-
-    @Override
-    public void onLocationChanged(Location location){
-
-    }
-
 //***** Implement your onDataChanged callback method. Check to see
 //***** the currentItem is the last or not and act accordingly (either send the
 //***** next item or if last item, send a message to the Wear (on a new thread)
@@ -299,9 +278,31 @@ public class MainActivity extends AppCompatActivity implements
 
     public void onDataChanged(DataEventBuffer dataEvents){
 
+
         for (DataEvent event:dataEvents){
             if (event.getType() == DataEvent.TYPE_CHANGED){
+                DataMap dataMap = DataMapItem.fromDataItem(event.getDataItem()).getDataMap();
+                String path = event.getDataItem().getUri().getPath();
+                //check our path
+                if (path.equals(FOUND_PATH)) {
+                    HashMap<String, String> item = new HashMap<String, String>();
 
+                    item.put("itemPic", huntObjects.get(currentItem).get("picture"));
+                    item.put("foundAt", dataMap.getString(LOCATION_KEY));
+                    foundObjects.add(item);
+                    currentItem++;
+                    if (currentItem >= 5) {
+                        sendMessage(DONE_PATH, "The hunt is finished!");
+                        startButton.setText("Tap to start again!");
+                        startButton.setEnabled(true);
+                        currentItem = 0;
+                    } else {
+                        Bitmap image = BitmapFactory.decodeResource(getResources(),
+                                Integer.parseInt(huntObjects.get(currentItem).get("picture")));
+                        sendPhoto(toAsset(image));
+                    }
+                    adapter.notifyDataSetChanged();
+                }
 
             }//changed type
         }//for

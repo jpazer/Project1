@@ -65,15 +65,20 @@ import static android.R.attr.path;
 public class MainActivity extends Activity implements
         GoogleApiClient.ConnectionCallbacks,
         GoogleApiClient.OnConnectionFailedListener,
-        LocationListener, MessageApi.MessageListener {
+        LocationListener, MessageApi.MessageListener, DataApi.DataListener {
 
     private static final int SPEECH_REQUEST_CODE = 0;
     private static final String TAG = "WearMainActivity";
-    private static String ITEM_KEY;
+
 
 
     //***** use the same paths/keys as in mobile side
-    private static final String WEAR_MESSAGE_PATH = "/message";
+    private static final String DONE_PATH = "/done";
+    private static final String FOUND_PATH = "/found-it";
+    private static final String ITEM_PATH = "/item";
+    private static String ITEM_KEY = "item";
+    private static String LOCATION_KEY = "location";
+
     private ArrayAdapter<String> mAdapter;
     private ListView mListView;
 
@@ -172,7 +177,7 @@ public class MainActivity extends Activity implements
                             //call code to send response
                             sendData(latitude, longitude, System.currentTimeMillis());
                             String msg = "Location sent";
-                            Log.d("message", msg);
+                            showDialog(msg);
                             break;
                         case DialogInterface.BUTTON_NEGATIVE:
                             //ignore
@@ -199,7 +204,12 @@ public class MainActivity extends Activity implements
 //***** or disconnect/remove listeners (onPause)
     @Override
     public void onPause() {
-
+        if (mGoogleAPIClient != null && mGoogleAPIClient.isConnected()) {
+            LocationServices.FusedLocationApi.removeLocationUpdates(mGoogleAPIClient, this);
+            Wearable.MessageApi.removeListener(mGoogleAPIClient, this);
+            Wearable.DataApi.removeListener(mGoogleAPIClient, this);
+            mGoogleAPIClient.disconnect();
+        }
     }
 
     @Override
@@ -236,8 +246,9 @@ public class MainActivity extends Activity implements
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             return;
         }
-        LocationServices.FusedLocationApi.requestLocationUpdates(mGoogleAPIClient, locationRequest, this);
 
+        LocationServices.FusedLocationApi.requestLocationUpdates(mGoogleAPIClient, locationRequest, this);
+        Wearable.DataApi.addListener(mGoogleAPIClient, this);
         Wearable.MessageApi.addListener(mGoogleAPIClient, this);
 
     }//onConnected
@@ -258,42 +269,24 @@ public class MainActivity extends Activity implements
     }
 
 
-    @Override
-    protected void onStop() {
-        //disconnect from google play services/ message api
-        if (mGoogleAPIClient != null) {
-            Wearable.MessageApi.removeListener(mGoogleAPIClient, this);
-            if (mGoogleAPIClient.isConnected()) {
-                LocationServices.FusedLocationApi.removeLocationUpdates(mGoogleAPIClient, this);
-                mGoogleAPIClient.disconnect();
-            }
-        }
-        super.onStop();
-    }
-
-    @Override
-    public void onDestroy() {
-        if (mGoogleAPIClient != null) {
-            mGoogleAPIClient.unregisterConnectionCallbacks(this);
-        }
-        super.onDestroy();
-    }
-
 //***** implement your onDataChanged method, checking your path
 //***** to see if it is the next item. This code will get the image from
 //***** You may also want to set your working on an item flag to true here.
-
+@Override
     public void onDataChanged(DataEventBuffer dataEvents) {
-        working = true;
-
         for (DataEvent event : dataEvents) {
             if (event.getType() == DataEvent.TYPE_CHANGED) {
-
-                DataMapItem dataMapItem = DataMapItem.fromDataItem(event.getDataItem());
-                Asset photoAsset = dataMapItem.getDataMap()
-                        .getAsset(ITEM_KEY);
-                // Loads image on background thread.
-                new LoadBitmapAsyncTask().execute(photoAsset);
+                //get the path
+                DataMap dataMap = DataMapItem.fromDataItem(event.getDataItem()).getDataMap();
+                String path = event.getDataItem().getUri().getPath();
+                //check our path
+                if (path.equals(ITEM_PATH)) {
+                    working = true;
+                    DataMapItem dataMapItem = DataMapItem.fromDataItem(event.getDataItem());
+                    Asset photoAsset = dataMapItem.getDataMap().getAsset(ITEM_KEY);
+                    // Loads image on background thread.
+                    new LoadBitmapAsyncTask().execute(photoAsset);
+                }
             }//changed type
         }//for
     }
@@ -305,42 +298,12 @@ public class MainActivity extends Activity implements
 //***** You may also want to turn your working on an item flag to false here as well
     @Override
     public void onMessageReceived(final MessageEvent messageEvent) {
-        working = false;
-
         //Check the path to see if one we want
-        //add the payload to the list
-        runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                if (messageEvent.getPath().equalsIgnoreCase(WEAR_MESSAGE_PATH)) {
-                    ///////////////////////////////////////////
-                }
-            }
-        });
-
-        itemPhoto.setImageResource(R.drawable.photo_placeholder);
-        DialogInterface.OnClickListener dialogClickListener = new DialogInterface.OnClickListener() {
-            @Override
-            public void onClick(DialogInterface dialog, int choice) {
-                switch (choice) {
-                    case DialogInterface.BUTTON_POSITIVE:
-                        //itemPhoto.setImageResource(R.drawable.photo_placeholder);
-                        break;
-                    case DialogInterface.BUTTON_NEGATIVE:
-                        //ignore
-                        break;
-                }
-            }
-        };
-
-        LayoutInflater inflater = this.getLayoutInflater();
-
-        View dialogView = inflater.inflate(R.layout.myalert, null);
-        TextView textMsg = (TextView) dialogView.findViewById(R.id.msgText);
-        textMsg.setText("Hunt is over, Congratulations!");
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setView(dialogView)
-                .setPositiveButton("OK", dialogClickListener).show();
+        if (messageEvent.getPath().equalsIgnoreCase(DONE_PATH)) {
+            working = false;
+            itemPhoto.setImageResource(R.drawable.photo_placeholder);
+            showDialog("You've found it all!");
+        }
 
     }//onMessageReceived
 
@@ -381,33 +344,36 @@ public class MainActivity extends Activity implements
             } else {
                 msg = "You have to say\n'Found it'";
             }
-            DialogInterface.OnClickListener dialogClickListener = new DialogInterface.OnClickListener() {
-                @Override
-                public void onClick(DialogInterface dialog, int choice) {
-                    switch (choice) {
-                        case DialogInterface.BUTTON_POSITIVE:
-                            //itemPhoto.setImageResource(R.drawable.photo_placeholder);
-                            break;
-                        case DialogInterface.BUTTON_NEGATIVE:
-                            //ignore
-                            break;
-                    }
-                }
-            };
-
-            LayoutInflater inflater = this.getLayoutInflater();
-
-            View dialogView = inflater.inflate(R.layout.myalert, null);
-            TextView textMsg = (TextView) dialogView.findViewById(R.id.msgText);
-            textMsg.setText(msg);
-            AlertDialog.Builder builder = new AlertDialog.Builder(this);
-            builder.setView(dialogView)
-                    .setPositiveButton("OK", dialogClickListener).show();
+            showDialog(msg);
         }
         working = true;
         super.onActivityResult(requestCode, resultCode, data);
     }//onActivityResult
 
+    private void showDialog(String msg) {
+        DialogInterface.OnClickListener dialogClickListener = new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int choice) {
+                switch (choice) {
+                    case DialogInterface.BUTTON_POSITIVE:
+                        //itemPhoto.setImageResource(R.drawable.photo_placeholder);
+                        break;
+                    case DialogInterface.BUTTON_NEGATIVE:
+                        //ignore
+                        break;
+                }
+            }
+        };
+
+        LayoutInflater inflater = this.getLayoutInflater();
+
+        View dialogView = inflater.inflate(R.layout.myalert, null);
+        TextView textMsg = (TextView) dialogView.findViewById(R.id.msgText);
+        textMsg.setText(msg);
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setView(dialogView)
+                .setPositiveButton("OK", dialogClickListener).show();
+    }
     //***** finish the code for free form voice input to allow "found it" to be said: see
     //***** https://developer.android.com/training/wearables/apps/voice.html
     private void doVoiceInput() {
@@ -422,12 +388,12 @@ public class MainActivity extends Activity implements
         //The path here is used to reference this object and
         //make it unique compared to all the other once that we can
         //create.
-        PutDataMapRequest putDataMapRequest = PutDataMapRequest.create("/found-it");
+        PutDataMapRequest putDataMapRequest = PutDataMapRequest.create(FOUND_PATH);
 
         //Next we use put methods to add an String (location info as a string) 
         //and long key value pair for the time.
         String data = String.valueOf(latitude) + "," + String.valueOf(longitude);
-        putDataMapRequest.getDataMap().putString("found-it", data);
+        putDataMapRequest.getDataMap().putString(LOCATION_KEY, data);
         putDataMapRequest.getDataMap().putLong("timestamp", timestamp);
 
         //We then use putDataItem to submit the object,
@@ -444,6 +410,8 @@ public class MainActivity extends Activity implements
                         } else {
                             //item been collected but not necessarily delivered
                             Log.d("WATCH", "Succesfully sent found-it location data item" + path + dataItemResult.getStatus());
+                            //set back to placeholder image for feedback
+                            itemPhoto.setImageResource(R.drawable.photo_placeholder);
                         }
                     }
                 });
