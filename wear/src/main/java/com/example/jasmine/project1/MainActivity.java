@@ -74,6 +74,8 @@ public class MainActivity extends Activity implements
 
     //***** use the same paths/keys as in mobile side
     private static final String WEAR_MESSAGE_PATH = "/message";
+    private ArrayAdapter<String> mAdapter;
+    private ListView mListView;
 
 
     //***** create your GoogleApiClient

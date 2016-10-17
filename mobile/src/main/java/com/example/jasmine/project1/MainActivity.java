@@ -13,6 +13,7 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.ListView;
 import android.widget.SimpleAdapter;
@@ -63,6 +64,9 @@ public class MainActivity extends AppCompatActivity implements
     private GoogleApiClient mGoogleAPIClient;
     private String currentItem;
     private static final String WEAR_MESSAGE_PATH = "/message";
+    private static final String START_ACTIVITY = "/start_activity";
+    private ArrayAdapter<String> mAdapter;
+    private ListView mListView;
 
     private ArrayList<HashMap<String,String>> huntObjects;
     private ArrayList<HashMap<String,String>> foundObjects;
@@ -258,6 +262,8 @@ public class MainActivity extends AppCompatActivity implements
             return;
         }
         LocationServices.FusedLocationApi.requestLocationUpdates(mGoogleAPIClient,locationRequest,this);
+
+        sendMessage(START_ACTIVITY, "");
     }//onConnected
 
     @Override
@@ -290,6 +296,7 @@ public class MainActivity extends AppCompatActivity implements
 //***** next item or if last item, send a message to the Wear (on a new thread)
 //***** that the hunt is finished.  
 //***** Get the found item, add it to the foundObjects HashMap
+
     public void onDataChanged(DataEventBuffer dataEvents){
 
         for (DataEvent event:dataEvents){
@@ -300,5 +307,28 @@ public class MainActivity extends AppCompatActivity implements
         }//for
 
     }
-   
+
+    //send a message to each node using MessageAPI
+    private void sendMessage(final String path, final String text) {
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                //get a list of nodes connected to device
+                NodeApi.GetConnectedNodesResult nodes =
+                        Wearable.NodeApi.getConnectedNodes(mGoogleAPIClient)
+                                .await();
+
+                for (Node node : nodes.getNodes()) {
+                    MessageApi.SendMessageResult result =
+                            Wearable.MessageApi.sendMessage(
+                                    mGoogleAPIClient, node.getId(), path, text.getBytes())
+                                    .await();
+                }//for
+
+
+            }//run()
+        }).start();
+    }//send message
+
+
 } //class
