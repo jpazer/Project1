@@ -7,18 +7,15 @@ import android.app.AlertDialog;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
-import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.location.Location;
-import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.speech.RecognizerIntent;
 import android.support.annotation.NonNull;
 import android.support.v4.content.ContextCompat;
 import android.support.v4.view.GestureDetectorCompat;
-import android.support.wearable.view.ConfirmationOverlay;
 import android.support.wearable.view.WatchViewStub;
 import android.util.Log;
 import android.view.GestureDetector;
@@ -26,10 +23,7 @@ import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
-import android.webkit.ConsoleMessage;
-import android.widget.ArrayAdapter;
 import android.widget.ImageView;
-import android.widget.ListView;
 import android.widget.TextView;
 
 import com.google.android.gms.common.ConnectionResult;
@@ -39,8 +33,6 @@ import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.common.api.ResultCallback;
 import com.google.android.gms.wearable.Asset;
-import com.google.android.gms.wearable.CapabilityApi;
-import com.google.android.gms.wearable.CapabilityInfo;
 import com.google.android.gms.wearable.DataApi;
 import com.google.android.gms.wearable.DataEvent;
 import com.google.android.gms.wearable.DataEventBuffer;
@@ -51,9 +43,7 @@ import com.google.android.gms.wearable.MessageEvent;
 import com.google.android.gms.wearable.PutDataMapRequest;
 import com.google.android.gms.wearable.PutDataRequest;
 import com.google.android.gms.wearable.Wearable;
-import com.google.android.gms.wearable.WearableListenerService;
 
-import java.io.Console;
 import java.io.InputStream;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -70,28 +60,20 @@ public class MainActivity extends Activity implements
     private static final int SPEECH_REQUEST_CODE = 0;
     private static final String TAG = "WearMainActivity";
 
-
-
     //***** use the same paths/keys as in mobile side
     private static final String DONE_PATH = "/done";
     private static final String FOUND_PATH = "/found-it";
     private static final String ITEM_PATH = "/item";
-    private static String ITEM_KEY = "item";
-    private static String LOCATION_KEY = "location";
-
-    private ArrayAdapter<String> mAdapter;
-    private ListView mListView;
+    private String ITEM_KEY = "item";
+    private String LOCATION_KEY = "location";
 
 
     //***** create your GoogleApiClient
     private GoogleApiClient mGoogleAPIClient;
 
     private ImageView itemPhoto;
-    private String locationInfo = "Not Known";
     private GestureDetectorCompat tapDetector;
-
     private double latitude, longitude;
-
 
     //***** You might want some sort of boolean flag as to whether you are
 //***** currently looking for an item or not.
@@ -107,7 +89,6 @@ public class MainActivity extends Activity implements
 
 //***** create and build you GoogleApiClient and add the Wearable and LocationServices APIs
 //***** and callbacks
-
         final WatchViewStub stub = (WatchViewStub) findViewById(R.id.watch_view_stub);
         stub.setOnLayoutInflatedListener(new WatchViewStub.OnLayoutInflatedListener() {
             @Override
@@ -125,7 +106,7 @@ public class MainActivity extends Activity implements
                     .addOnConnectionFailedListener(this)
                     .build();
         }
-        if (mGoogleAPIClient != null && !mGoogleAPIClient.isConnected() || mGoogleAPIClient.isConnecting()) {
+        if (!mGoogleAPIClient.isConnected() || mGoogleAPIClient.isConnecting()) {
             mGoogleAPIClient.connect();
         }
         //create a tap detector
@@ -148,7 +129,6 @@ public class MainActivity extends Activity implements
     public class MyGestureListener extends GestureDetector.SimpleOnGestureListener {
 
         final Context myContext;
-
         public MyGestureListener(Context context) {
             myContext = context;
         }
@@ -214,12 +194,11 @@ public class MainActivity extends Activity implements
 
     @Override
     public void onResume() {
-        if (mGoogleAPIClient != null && !mGoogleAPIClient.isConnected() || mGoogleAPIClient.isConnecting()) {
+        if (!mGoogleAPIClient.isConnected() || mGoogleAPIClient.isConnecting()) {
             mGoogleAPIClient.connect();
         }
         super.onResume();
     }
-
 
     //***** implement your GoogleApiClient connection methods. In the onConnected
 //***** method, add your listeners for the message and data APIs and the
@@ -246,7 +225,7 @@ public class MainActivity extends Activity implements
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             return;
         }
-
+        //add listeners
         LocationServices.FusedLocationApi.requestLocationUpdates(mGoogleAPIClient, locationRequest, this);
         Wearable.DataApi.addListener(mGoogleAPIClient, this);
         Wearable.MessageApi.addListener(mGoogleAPIClient, this);
@@ -255,19 +234,14 @@ public class MainActivity extends Activity implements
 
     @Override
     public void onConnectionSuspended(int i) {
-
     }
-
     @Override
     public void onConnectionFailed(ConnectionResult connectionResult) {
-
     }
-
     @Override
     protected void onStart() {
         super.onStart();
     }
-
 
 //***** implement your onDataChanged method, checking your path
 //***** to see if it is the next item. This code will get the image from
@@ -277,7 +251,6 @@ public class MainActivity extends Activity implements
         for (DataEvent event : dataEvents) {
             if (event.getType() == DataEvent.TYPE_CHANGED) {
                 //get the path
-                DataMap dataMap = DataMapItem.fromDataItem(event.getDataItem()).getDataMap();
                 String path = event.getDataItem().getUri().getPath();
                 //check our path
                 if (path.equals(ITEM_PATH)) {
@@ -286,6 +259,7 @@ public class MainActivity extends Activity implements
                     Asset photoAsset = dataMapItem.getDataMap().getAsset(ITEM_KEY);
                     // Loads image on background thread.
                     new LoadBitmapAsyncTask().execute(photoAsset);
+                    Log.d("pic", "The picture has been received and is loading");
                 }
             }//changed type
         }//for
@@ -316,11 +290,12 @@ public class MainActivity extends Activity implements
     }
 
 
-    //***** Finish this code for the voice input:
+//***** Finish this code for the voice input:
 // This callback is invoked when the Speech Recognizer returns.
 // This is where you process the intent and extract the speech text from the intent.
 //***** See the link for doVoiceInput for more info on this method.
 //Create an intent that can start the Speech Recognizer activity 
+
     private void displaySpeechRecognizer() {
         Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
         intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
@@ -356,7 +331,7 @@ public class MainActivity extends Activity implements
             public void onClick(DialogInterface dialog, int choice) {
                 switch (choice) {
                     case DialogInterface.BUTTON_POSITIVE:
-                        //itemPhoto.setImageResource(R.drawable.photo_placeholder);
+                        itemPhoto.setImageResource(R.drawable.photo_placeholder);
                         break;
                     case DialogInterface.BUTTON_NEGATIVE:
                         //ignore
@@ -379,7 +354,7 @@ public class MainActivity extends Activity implements
     private void doVoiceInput() {
 
         // Start the activity, the intent will be populated with the speech text
-
+        displaySpeechRecognizer();
     }
 
     //***** There is where you will send the data back to the mobile side
@@ -406,10 +381,10 @@ public class MainActivity extends Activity implements
                     @Override
                     public void onResult(@NonNull DataApi.DataItemResult dataItemResult) {
                         if (!dataItemResult.getStatus().isSuccess()) {
-                            Log.e("WATCH", "Failed to send found-it location data item" + path + dataItemResult.getStatus());
+                            Log.e("WATCH", "Failed to send found-it location data item /" + path + dataItemResult.getStatus());
                         } else {
                             //item been collected but not necessarily delivered
-                            Log.d("WATCH", "Succesfully sent found-it location data item" + path + dataItemResult.getStatus());
+                            Log.d("WATCH", "Successfully sent found-it location data item /" + path + dataItemResult.getStatus());
                             //set back to placeholder image for feedback
                             itemPhoto.setImageResource(R.drawable.photo_placeholder);
                         }

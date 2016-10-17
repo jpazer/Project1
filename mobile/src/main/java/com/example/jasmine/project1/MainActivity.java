@@ -69,8 +69,8 @@ public class MainActivity extends AppCompatActivity implements
     private static final String DONE_PATH = "/done";
     private static final String FOUND_PATH = "/found-it";
     private static final String ITEM_PATH = "/item";
-    private static String ITEM_KEY = "item";
-    private static String LOCATION_KEY = "location";
+    private String ITEM_KEY = "item";
+    private String LOCATION_KEY = "location";
 
 
     private ArrayList<HashMap<String,String>> huntObjects;
@@ -139,8 +139,7 @@ public class MainActivity extends AppCompatActivity implements
         listView.setAdapter(adapter);
 
         // display message on empty list
-        TextView emptyText = (TextView) View.inflate(this,
-                R.layout.empty, null);
+        TextView emptyText = (TextView) View.inflate(this, R.layout.empty, null);
         emptyText.setVisibility(View.GONE);
 
         ((ViewGroup)listView.getParent()).addView(emptyText);
@@ -161,7 +160,7 @@ public class MainActivity extends AppCompatActivity implements
 //***** adding the items to foundObjects and uncomment the code below
 //***** it
     public void startHunt(View v) {
-        
+
         foundObjects.clear();
         adapter.notifyDataSetChanged();
 
@@ -222,10 +221,10 @@ public class MainActivity extends AppCompatActivity implements
                     @Override
                     public void onResult(@NonNull DataApi.DataItemResult dataItemResult) {
                         if (!dataItemResult.getStatus().isSuccess()) {
-                            Log.e("WATCH", "Failed to send asset data item" + path + dataItemResult.getStatus());
+                            Log.e("WATCH", "Failed to send asset data item /" + path + dataItemResult.getStatus());
                         } else {
                             //item been collected but not necessarily delivered
-                            Log.d("WATCH", "Succesfully sent asset data item" + path + dataItemResult.getStatus());
+                            Log.d("WATCH", "Successfully sent asset data item /" + path + dataItemResult.getStatus());
                         }
                     }
                 });
@@ -237,7 +236,7 @@ public class MainActivity extends AppCompatActivity implements
 //***** Listeners (onStop)
     @Override
     protected void onStart(){
-        if (mGoogleAPIClient != null && !mGoogleAPIClient.isConnected() || mGoogleAPIClient.isConnecting()) {
+        if (!mGoogleAPIClient.isConnected() || mGoogleAPIClient.isConnecting()) {
             mGoogleAPIClient.connect();
         }
         super.onStart();
@@ -259,15 +258,11 @@ public class MainActivity extends AppCompatActivity implements
     public void onConnected(Bundle connectionHint){
         Wearable.DataApi.addListener(mGoogleAPIClient, this);
     }//onConnected
-
     @Override
-    public void onConnectionSuspended(int i){
-
+    public void onConnectionSuspended(int i) {
     }
-
     @Override
-    public void onConnectionFailed(ConnectionResult connectionResult){
-
+    public void onConnectionFailed(ConnectionResult connectionResult) {
     }
 
 //***** Implement your onDataChanged callback method. Check to see
@@ -277,8 +272,6 @@ public class MainActivity extends AppCompatActivity implements
 //***** Get the found item, add it to the foundObjects HashMap
 
     public void onDataChanged(DataEventBuffer dataEvents){
-
-
         for (DataEvent event:dataEvents){
             if (event.getType() == DataEvent.TYPE_CHANGED){
                 DataMap dataMap = DataMapItem.fromDataItem(event.getDataItem()).getDataMap();
@@ -297,8 +290,7 @@ public class MainActivity extends AppCompatActivity implements
                         startButton.setEnabled(true);
                         currentItem = 0;
                     } else {
-                        Bitmap image = BitmapFactory.decodeResource(getResources(),
-                                Integer.parseInt(huntObjects.get(currentItem).get("picture")));
+                        Bitmap image = BitmapFactory.decodeResource(getResources(), Integer.parseInt(huntObjects.get(currentItem).get("picture")));
                         sendPhoto(toAsset(image));
                     }
                     adapter.notifyDataSetChanged();
