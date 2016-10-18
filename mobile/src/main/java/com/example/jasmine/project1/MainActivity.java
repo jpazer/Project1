@@ -150,6 +150,8 @@ public class MainActivity extends AppCompatActivity implements
 //**** Create your GoogleApiClient here....
         mGoogleAPIClient = new GoogleApiClient.Builder(this)
                 .addApi(Wearable.API)
+                .addConnectionCallbacks(this)
+                .addOnConnectionFailedListener(this)
                 .build();
         mGoogleAPIClient.connect();
         
@@ -270,14 +272,16 @@ public class MainActivity extends AppCompatActivity implements
 //***** next item or if last item, send a message to the Wear (on a new thread)
 //***** that the hunt is finished.  
 //***** Get the found item, add it to the foundObjects HashMap
-
+@Override
     public void onDataChanged(DataEventBuffer dataEvents){
+    Log.d("hint", "on data changed mobile ");
         for (DataEvent event:dataEvents){
             if (event.getType() == DataEvent.TYPE_CHANGED){
-                DataMap dataMap = DataMapItem.fromDataItem(event.getDataItem()).getDataMap();
                 String path = event.getDataItem().getUri().getPath();
                 //check our path
+                Log.d("hint", "on data changed mobile " + path);
                 if (path.equals(FOUND_PATH)) {
+                    DataMap dataMap = DataMapItem.fromDataItem(event.getDataItem()).getDataMap();
                     HashMap<String, String> item = new HashMap<String, String>();
 
                     item.put("itemPic", huntObjects.get(currentItem).get("picture"));
@@ -294,15 +298,14 @@ public class MainActivity extends AppCompatActivity implements
                         sendPhoto(toAsset(image));
                     }
                     adapter.notifyDataSetChanged();
-                }
-
+                }//if
             }//changed type
         }//for
-
     }
 
     //send a message to each node using MessageAPI
     private void sendMessage(final String path, final String text) {
+        Log.d("sendMsg", text);
         new Thread(new Runnable() {
             @Override
             public void run() {
@@ -317,11 +320,7 @@ public class MainActivity extends AppCompatActivity implements
                                     mGoogleAPIClient, node.getId(), path, text.getBytes())
                                     .await();
                 }//for
-
-
             }//run()
         }).start();
     }//send message
-
-
 } //class

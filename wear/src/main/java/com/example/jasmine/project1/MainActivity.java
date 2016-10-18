@@ -190,6 +190,7 @@ public class MainActivity extends Activity implements
             Wearable.DataApi.removeListener(mGoogleAPIClient, this);
             mGoogleAPIClient.disconnect();
         }
+        super.onPause();
     }
 
     @Override
@@ -277,6 +278,7 @@ public class MainActivity extends Activity implements
             working = false;
             itemPhoto.setImageResource(R.drawable.photo_placeholder);
             showDialog("You've found it all!");
+            Log.d("msg", "You've found it all!");
         }
 
     }//onMessageReceived
@@ -331,7 +333,6 @@ public class MainActivity extends Activity implements
             public void onClick(DialogInterface dialog, int choice) {
                 switch (choice) {
                     case DialogInterface.BUTTON_POSITIVE:
-                        itemPhoto.setImageResource(R.drawable.photo_placeholder);
                         break;
                     case DialogInterface.BUTTON_NEGATIVE:
                         //ignore
@@ -369,6 +370,7 @@ public class MainActivity extends Activity implements
         //and long key value pair for the time.
         String data = String.valueOf(latitude) + "," + String.valueOf(longitude);
         putDataMapRequest.getDataMap().putString(LOCATION_KEY, data);
+        Log.d("location", data);
         putDataMapRequest.getDataMap().putLong("timestamp", timestamp);
 
         //We then use putDataItem to submit the object,
@@ -390,10 +392,7 @@ public class MainActivity extends Activity implements
                         }
                     }
                 });
-
-
         //if successful, change to placeholder image again.
-
     }//send data
 
     /*
